@@ -4,7 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	_ "github.com/joho/godotenv/autoload"
 	"gorm.io/gorm"
 	"gotest.tools/v3/assert"
 )
