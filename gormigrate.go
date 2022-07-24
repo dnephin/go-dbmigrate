@@ -55,24 +55,6 @@ type Gormigrate struct {
 	initSchema InitSchemaFunc
 }
 
-// ReservedIDError is returned when a migration is using a reserved ID
-type ReservedIDError struct {
-	ID string
-}
-
-func (e *ReservedIDError) Error() string {
-	return fmt.Sprintf(`gormigrate: Reserved migration ID: "%s"`, e.ID)
-}
-
-// DuplicatedIDError is returned when more than one migration have the same ID
-type DuplicatedIDError struct {
-	ID string
-}
-
-func (e *DuplicatedIDError) Error() string {
-	return fmt.Sprintf(`gormigrate: Duplicated migration ID: "%s"`, e.ID)
-}
-
 var (
 	// DefaultOptions can be used if you don't want to think about options.
 	DefaultOptions = &Options{
@@ -156,11 +138,7 @@ func (g *Gormigrate) migrate(migrationID string) error {
 		return ErrNoMigrationDefined
 	}
 
-	if err := g.checkReservedID(); err != nil {
-		return err
-	}
-
-	if err := g.checkDuplicatedID(); err != nil {
+	if err := g.validate(); err != nil {
 		return err
 	}
 
@@ -211,24 +189,19 @@ func (g *Gormigrate) hasMigrations() bool {
 	return g.initSchema != nil || len(g.migrations) > 0
 }
 
-// Check whether any migration is using a reserved ID.
-// For now there's only have one reserved ID, but there may be more in the future.
-func (g *Gormigrate) checkReservedID() error {
+func (g *Gormigrate) validate() error {
+	lookup := make(map[string]struct{}, len(g.migrations))
+	ids := make([]string, len(g.migrations))
+
 	for _, m := range g.migrations {
 		if m.ID == initSchemaMigrationID {
-			return &ReservedIDError{ID: m.ID}
+			return fmt.Errorf("migration can not use reserved ID: %v", m.ID)
 		}
-	}
-	return nil
-}
-
-func (g *Gormigrate) checkDuplicatedID() error {
-	lookup := make(map[string]struct{}, len(g.migrations))
-	for _, m := range g.migrations {
 		if _, ok := lookup[m.ID]; ok {
-			return &DuplicatedIDError{ID: m.ID}
+			return fmt.Errorf("duplicate migration ID: %v", m.ID)
 		}
 		lookup[m.ID] = struct{}{}
+		ids = append(ids, m.ID)
 	}
 	return nil
 }

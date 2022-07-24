@@ -277,8 +277,8 @@ func TestReservedID(t *testing.T) {
 		}
 
 		m := New(db, DefaultOptions, migrationsReservedID)
-		_, isReservedIDError := m.Migrate().(*ReservedIDError)
-		assert.Assert(t, isReservedIDError)
+		err := m.Migrate()
+		assert.ErrorContains(t, err, "migration can not use reserved ID")
 	})
 }
 
@@ -300,8 +300,8 @@ func TestDuplicatedID(t *testing.T) {
 		}
 
 		m := New(db, DefaultOptions, migrationsDuplicatedID)
-		_, isDuplicatedIDError := m.Migrate().(*DuplicatedIDError)
-		assert.Assert(t, isDuplicatedIDError)
+		err := m.Migrate()
+		assert.ErrorContains(t, err, "duplicate migration ID: 201705061500")
 	})
 }
 
