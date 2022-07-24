@@ -74,17 +74,10 @@ func New(db *gorm.DB, options Options, migrations []*Migration) *Gormigrate {
 
 // Migrate executes all migrations that did not run yet.
 func (g *Gormigrate) Migrate() error {
-	if !g.hasMigrations() {
+	if g.options.InitSchema == nil && len(g.migrations) == 0 {
 		return fmt.Errorf("there are no migrations")
 	}
-	var targetMigrationID string
-	if len(g.migrations) > 0 {
-		targetMigrationID = g.migrations[len(g.migrations)-1].ID
-	}
-	return g.migrate(targetMigrationID)
-}
 
-func (g *Gormigrate) migrate(migrationID string) error {
 	if err := g.validate(); err != nil {
 		return err
 	}
@@ -96,8 +89,8 @@ func (g *Gormigrate) migrate(migrationID string) error {
 		return err
 	}
 
-	if g.options.InitSchema != nil {
-		canInitializeSchema, err := g.canInitializeSchema()
+	if g.options.InitSchema != nil { // TODO: remove this if
+		canInitializeSchema, err := g.shouldInitializeSchema()
 		if err != nil {
 			return err
 		}
@@ -113,15 +106,8 @@ func (g *Gormigrate) migrate(migrationID string) error {
 		if err := g.runMigration(migration); err != nil {
 			return err
 		}
-		if migrationID != "" && migration.ID == migrationID {
-			break
-		}
 	}
 	return g.commit()
-}
-
-func (g *Gormigrate) hasMigrations() bool {
-	return g.options.InitSchema != nil || len(g.migrations) > 0
 }
 
 func (g *Gormigrate) validate() error {
@@ -241,7 +227,6 @@ func (g *Gormigrate) runInitSchema() error {
 	if err := g.insertMigration(initSchemaMigrationID); err != nil {
 		return err
 	}
-
 	for _, migration := range g.migrations {
 		if err := g.insertMigration(migration.ID); err != nil {
 			return err
@@ -286,9 +271,8 @@ func (g *Gormigrate) migrationRan(m *Migration) (bool, error) {
 	return count > 0, err
 }
 
-// The schema can be initialised only if it hasn't been initialised yet
-// and no other migration has been applied already.
-func (g *Gormigrate) canInitializeSchema() (bool, error) {
+// TODO: only check for the existence of the table
+func (g *Gormigrate) shouldInitializeSchema() (bool, error) {
 	migrationRan, err := g.migrationRan(&Migration{ID: initSchemaMigrationID})
 	if err != nil {
 		return false, err
