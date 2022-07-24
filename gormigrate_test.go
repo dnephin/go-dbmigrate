@@ -2,8 +2,12 @@ package gormigrate
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gotest.tools/v3/assert"
 )
@@ -400,8 +404,16 @@ func tableCount(t *testing.T, db *gorm.DB, tableName string) (count int64) {
 }
 
 func forEachDatabase(t *testing.T, fn func(database *gorm.DB), dialects ...string) {
-	if len(databases) == 0 {
-		panic("No database choosen for testing!")
+	dir := t.TempDir()
+
+	databases := []database{
+		{dialect: "sqlite3", driver: sqlite.Open("file:" + filepath.Join(dir, "sqlite3.db"))},
+	}
+
+	if pg := os.Getenv("PG_CONN_STRING"); pg != "" {
+		databases = append(databases, database{
+			dialect: "postgres", driver: postgres.Open(pg),
+		})
 	}
 
 	for _, database := range databases {
@@ -410,7 +422,7 @@ func forEachDatabase(t *testing.T, fn func(database *gorm.DB), dialects ...strin
 		}
 
 		// Ensure defers are not stacked up for each DB
-		func() {
+		t.Run(database.driver.Name(), func(t *testing.T) {
 			db, err := gorm.Open(database.driver, &gorm.Config{})
 			assert.NilError(t, err, "Could not connect to database %s, %v", database.dialect, err)
 
@@ -418,7 +430,7 @@ func forEachDatabase(t *testing.T, fn func(database *gorm.DB), dialects ...strin
 			assert.NilError(t, db.Migrator().DropTable("migrations", "people", "pets"))
 
 			fn(db)
-		}()
+		})
 	}
 }
 
