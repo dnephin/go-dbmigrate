@@ -7,18 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	initSchemaMigrationID = "SCHEMA_INIT"
-)
-
-// MigrateFunc is the func signature for migrating.
-type MigrateFunc func(*gorm.DB) error
-
-// RollbackFunc is the func signature for rollbacking.
-type RollbackFunc func(*gorm.DB) error
-
-// InitSchemaFunc is the func signature for initializing the schema.
-type InitSchemaFunc func(*gorm.DB) error
+const initSchemaMigrationID = "SCHEMA_INIT"
 
 // Options define options for all migrations.
 type Options struct {
@@ -41,9 +30,9 @@ type Migration struct {
 	// ID is the migration identifier. Usually a timestamp like "201601021504".
 	ID string
 	// Migrate is a function that will br executed while running this migration.
-	Migrate MigrateFunc
+	Migrate func(*gorm.DB) error
 	// Rollback will be executed on rollback. Can be nil.
-	Rollback RollbackFunc
+	Rollback func(*gorm.DB) error
 }
 
 // Gormigrate represents a collection of all migrations of a database schema.
@@ -52,7 +41,7 @@ type Gormigrate struct {
 	tx         *gorm.DB
 	options    *Options
 	migrations []*Migration
-	initSchema InitSchemaFunc
+	initSchema func(*gorm.DB) error
 }
 
 var (
@@ -64,24 +53,6 @@ var (
 		UseTransaction:            false,
 		ValidateUnknownMigrations: false,
 	}
-
-	// ErrRollbackImpossible is returned when trying to rollback a migration
-	// that has no rollback function.
-	ErrRollbackImpossible = errors.New("gormigrate: It's impossible to rollback this migration")
-
-	// ErrNoMigrationDefined is returned when no migration is defined.
-	ErrNoMigrationDefined = errors.New("gormigrate: No migration defined")
-
-	// ErrMissingID is returned when the ID od migration is equal to ""
-	ErrMissingID = errors.New("gormigrate: Missing ID in migration")
-
-	// ErrNoRunMigration is returned when any run migration was found while
-	// running RollbackLast
-	ErrNoRunMigration = errors.New("gormigrate: Could not find last run migration")
-
-	// ErrMigrationIDDoesNotExist is returned when migrating or rolling back to a migration ID that
-	// does not exist in the list of migrations
-	ErrMigrationIDDoesNotExist = errors.New("gormigrate: Tried to migrate to an ID that doesn't exist")
 
 	// ErrUnknownPastMigration is returned if a migration exists in the DB that doesn't exist in the code
 	ErrUnknownPastMigration = errors.New("gormigrate: Found migration in DB that does not exist in code")
@@ -109,14 +80,14 @@ func New(db *gorm.DB, options *Options, migrations []*Migration) *Gormigrate {
 // The idea is preventing to run all migrations when a new clean database
 // is being migrating. In this function you should create all tables and
 // foreign key necessary to your application.
-func (g *Gormigrate) InitSchema(initSchema InitSchemaFunc) {
+func (g *Gormigrate) InitSchema(initSchema func(*gorm.DB) error) {
 	g.initSchema = initSchema
 }
 
 // Migrate executes all migrations that did not run yet.
 func (g *Gormigrate) Migrate() error {
 	if !g.hasMigrations() {
-		return ErrNoMigrationDefined
+		return fmt.Errorf("there are no migrations")
 	}
 	var targetMigrationID string
 	if len(g.migrations) > 0 {
@@ -134,10 +105,6 @@ func (g *Gormigrate) MigrateTo(migrationID string) error {
 }
 
 func (g *Gormigrate) migrate(migrationID string) error {
-	if !g.hasMigrations() {
-		return ErrNoMigrationDefined
-	}
-
 	if err := g.validate(); err != nil {
 		return err
 	}
@@ -194,7 +161,10 @@ func (g *Gormigrate) validate() error {
 	ids := make([]string, len(g.migrations))
 
 	for _, m := range g.migrations {
-		if m.ID == initSchemaMigrationID {
+		switch m.ID {
+		case "":
+			return fmt.Errorf("migration is missing an ID")
+		case initSchemaMigrationID:
 			return fmt.Errorf("migration can not use reserved ID: %v", m.ID)
 		}
 		if _, ok := lookup[m.ID]; ok {
@@ -212,13 +182,13 @@ func (g *Gormigrate) checkIDExist(migrationID string) error {
 			return nil
 		}
 	}
-	return ErrMigrationIDDoesNotExist
+	return fmt.Errorf("migration ID %v does not exist", migrationID)
 }
 
 // RollbackLast undo the last migration
 func (g *Gormigrate) RollbackLast() error {
 	if len(g.migrations) == 0 {
-		return ErrNoMigrationDefined
+		return fmt.Errorf("there are no migrations")
 	}
 
 	g.begin()
@@ -239,7 +209,7 @@ func (g *Gormigrate) RollbackLast() error {
 // Migration with the matching `migrationID` is not rolled back.
 func (g *Gormigrate) RollbackTo(migrationID string) error {
 	if len(g.migrations) == 0 {
-		return ErrNoMigrationDefined
+		return fmt.Errorf("there are no migrations")
 	}
 
 	if err := g.checkIDExist(migrationID); err != nil {
@@ -280,7 +250,7 @@ func (g *Gormigrate) getLastRunMigration() (*Migration, error) {
 			return migration, nil
 		}
 	}
-	return nil, ErrNoRunMigration
+	return nil, errors.New("could not find last run migration")
 }
 
 // RollbackMigration undo a migration.
@@ -296,7 +266,7 @@ func (g *Gormigrate) RollbackMigration(m *Migration) error {
 
 func (g *Gormigrate) rollbackMigration(m *Migration) error {
 	if m.Rollback == nil {
-		return ErrRollbackImpossible
+		return errors.New("migration can not be rollback back")
 	}
 
 	if err := m.Rollback(g.tx); err != nil {
@@ -325,10 +295,6 @@ func (g *Gormigrate) runInitSchema() error {
 }
 
 func (g *Gormigrate) runMigration(migration *Migration) error {
-	if len(migration.ID) == 0 {
-		return ErrMissingID
-	}
-
 	migrationRan, err := g.migrationRan(migration)
 	if err != nil {
 		return err

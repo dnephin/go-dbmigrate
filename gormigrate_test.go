@@ -246,10 +246,10 @@ func TestInitSchemaExistingMigrations(t *testing.T) {
 func TestMigrationIDDoesNotExist(t *testing.T) {
 	forEachDatabase(t, func(db *gorm.DB) {
 		m := New(db, DefaultOptions, migrations)
-		assert.Equal(t, ErrMigrationIDDoesNotExist, m.MigrateTo("1234"))
-		assert.Equal(t, ErrMigrationIDDoesNotExist, m.RollbackTo("1234"))
-		assert.Equal(t, ErrMigrationIDDoesNotExist, m.MigrateTo(""))
-		assert.Equal(t, ErrMigrationIDDoesNotExist, m.RollbackTo(""))
+		assert.ErrorContains(t, m.MigrateTo("1234"), "migration ID 1234 does not exist")
+		assert.ErrorContains(t, m.RollbackTo("1234"), "migration ID 1234 does not exist")
+		assert.ErrorContains(t, m.RollbackTo(""), "migration ID  does not exist")
+		assert.ErrorContains(t, m.RollbackTo(""), "migration ID  does not exist")
 	})
 }
 
@@ -264,7 +264,7 @@ func TestMissingID(t *testing.T) {
 		}
 
 		m := New(db, DefaultOptions, migrationsMissingID)
-		assert.Equal(t, ErrMissingID, m.Migrate())
+		assert.ErrorContains(t, m.Migrate(), "migration is missing an ID")
 	})
 }
 
@@ -313,13 +313,13 @@ func TestEmptyMigrationList(t *testing.T) {
 		t.Run("with empty list", func(t *testing.T) {
 			m := New(db, DefaultOptions, []*Migration{})
 			err := m.Migrate()
-			assert.Equal(t, ErrNoMigrationDefined, err)
+			assert.Error(t, err, "there are no migrations")
 		})
 
 		t.Run("with nil list", func(t *testing.T) {
 			m := New(db, DefaultOptions, nil)
 			err := m.Migrate()
-			assert.Equal(t, ErrNoMigrationDefined, err)
+			assert.Error(t, err, "there are no migrations")
 		})
 	})
 }
