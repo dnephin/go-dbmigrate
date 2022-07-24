@@ -133,7 +133,7 @@ func TestRollbackTo(t *testing.T) {
 func TestInitSchemaNoMigrations(t *testing.T) {
 	forEachDatabase(t, func(db *gorm.DB) {
 		m := New(db, DefaultOptions, []*Migration{})
-		m.InitSchema(func(tx *gorm.DB) error {
+		m.options.InitSchema = func(tx *gorm.DB) error {
 			if err := tx.AutoMigrate(&Person{}); err != nil {
 				return err
 			}
@@ -141,7 +141,7 @@ func TestInitSchemaNoMigrations(t *testing.T) {
 				return err
 			}
 			return nil
-		})
+		}
 
 		assert.NilError(t, m.Migrate())
 		assert.Assert(t, db.Migrator().HasTable(&Person{}))
@@ -156,12 +156,12 @@ func TestInitSchemaNoMigrations(t *testing.T) {
 func TestInitSchemaWithMigrations(t *testing.T) {
 	forEachDatabase(t, func(db *gorm.DB) {
 		m := New(db, DefaultOptions, migrations)
-		m.InitSchema(func(tx *gorm.DB) error {
+		m.options.InitSchema = func(tx *gorm.DB) error {
 			if err := tx.AutoMigrate(&Person{}); err != nil {
 				return err
 			}
 			return nil
-		})
+		}
 
 		assert.NilError(t, m.Migrate())
 		assert.Assert(t, db.Migrator().HasTable(&Person{}))
@@ -181,19 +181,19 @@ func TestInitSchemaAlreadyInitialised(t *testing.T) {
 		m := New(db, DefaultOptions, []*Migration{})
 
 		// Migrate with empty initialisation
-		m.InitSchema(func(tx *gorm.DB) error {
+		m.options.InitSchema = func(tx *gorm.DB) error {
 			return nil
-		})
+		}
 		assert.NilError(t, m.Migrate())
 
-		// Then migrate again, this time with a non empty initialisation
+		// Then migrate again, this time with a non-empty initialisation
 		// This second initialisation should not happen!
-		m.InitSchema(func(tx *gorm.DB) error {
+		m.options.InitSchema = func(tx *gorm.DB) error {
 			if err := tx.AutoMigrate(&Car{}); err != nil {
 				return err
 			}
 			return nil
-		})
+		}
 		assert.NilError(t, m.Migrate())
 
 		assert.Assert(t, !db.Migrator().HasTable(&Car{}))
@@ -215,14 +215,14 @@ func TestInitSchemaExistingMigrations(t *testing.T) {
 		// Migrate without initialisation
 		assert.NilError(t, m.Migrate())
 
-		// Then migrate again, this time with a non empty initialisation
+		// Then migrate again, this time with a non-empty initialisation
 		// This initialisation should not happen!
-		m.InitSchema(func(tx *gorm.DB) error {
+		m.options.InitSchema = func(tx *gorm.DB) error {
 			if err := tx.AutoMigrate(&Car{}); err != nil {
 				return err
 			}
 			return nil
-		})
+		}
 		assert.NilError(t, m.Migrate())
 
 		assert.Assert(t, !db.Migrator().HasTable(&Car{}))

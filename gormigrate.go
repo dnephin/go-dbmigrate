@@ -20,6 +20,12 @@ type Options struct {
 	// UseTransaction makes Gormigrate execute migrations inside a single transaction.
 	// Keep in mind that not all databases support DDL commands inside transactions.
 	UseTransaction bool
+
+	// InitSchema is used to create the database when no migrations table exists.
+	// This function should create all tables, and constraints. After this
+	// function is run, migrator will create the migrations table and populate
+	// it with the IDs of all the currently defined migrations.
+	InitSchema func(*gorm.DB) error
 }
 
 // Migration represents a database migration (a modification to be made on the database).
@@ -36,23 +42,20 @@ type Migration struct {
 type Gormigrate struct {
 	db         *gorm.DB
 	tx         *gorm.DB
-	options    *Options
+	options    Options
 	migrations []*Migration
-	initSchema func(*gorm.DB) error
 }
 
-var (
-	// DefaultOptions can be used if you don't want to think about options.
-	DefaultOptions = &Options{
-		TableName:      "migrations",
-		IDColumnName:   "id",
-		IDColumnSize:   255,
-		UseTransaction: false,
-	}
-)
+// DefaultOptions can be used if you don't want to think about options.
+var DefaultOptions = Options{
+	TableName:      "migrations",
+	IDColumnName:   "id",
+	IDColumnSize:   255,
+	UseTransaction: false,
+}
 
 // New returns a new Gormigrate.
-func New(db *gorm.DB, options *Options, migrations []*Migration) *Gormigrate {
+func New(db *gorm.DB, options Options, migrations []*Migration) *Gormigrate {
 	if options.TableName == "" {
 		options.TableName = DefaultOptions.TableName
 	}
@@ -67,14 +70,6 @@ func New(db *gorm.DB, options *Options, migrations []*Migration) *Gormigrate {
 		options:    options,
 		migrations: migrations,
 	}
-}
-
-// InitSchema sets a function that is run if no migration is found.
-// The idea is preventing to run all migrations when a new clean database
-// is being migrating. In this function you should create all tables and
-// foreign key necessary to your application.
-func (g *Gormigrate) InitSchema(initSchema func(*gorm.DB) error) {
-	g.initSchema = initSchema
 }
 
 // Migrate executes all migrations that did not run yet.
@@ -101,7 +96,7 @@ func (g *Gormigrate) migrate(migrationID string) error {
 		return err
 	}
 
-	if g.initSchema != nil {
+	if g.options.InitSchema != nil {
 		canInitializeSchema, err := g.canInitializeSchema()
 		if err != nil {
 			return err
@@ -125,10 +120,8 @@ func (g *Gormigrate) migrate(migrationID string) error {
 	return g.commit()
 }
 
-// There are migrations to apply if either there's a defined
-// initSchema function or if the list of migrations is not empty.
 func (g *Gormigrate) hasMigrations() bool {
-	return g.initSchema != nil || len(g.migrations) > 0
+	return g.options.InitSchema != nil || len(g.migrations) > 0
 }
 
 func (g *Gormigrate) validate() error {
@@ -242,7 +235,7 @@ func (g *Gormigrate) rollbackMigration(m *Migration) error {
 }
 
 func (g *Gormigrate) runInitSchema() error {
-	if err := g.initSchema(g.tx); err != nil {
+	if err := g.options.InitSchema(g.tx); err != nil {
 		return err
 	}
 	if err := g.insertMigration(initSchemaMigrationID); err != nil {
@@ -254,7 +247,6 @@ func (g *Gormigrate) runInitSchema() error {
 			return err
 		}
 	}
-
 	return nil
 }
 
