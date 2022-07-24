@@ -20,9 +20,6 @@ type Options struct {
 	// UseTransaction makes Gormigrate execute migrations inside a single transaction.
 	// Keep in mind that not all databases support DDL commands inside transactions.
 	UseTransaction bool
-	// ValidateUnknownMigrations will cause migrate to fail if there's unknown migration
-	// IDs in the database
-	ValidateUnknownMigrations bool
 }
 
 // Migration represents a database migration (a modification to be made on the database).
@@ -47,15 +44,11 @@ type Gormigrate struct {
 var (
 	// DefaultOptions can be used if you don't want to think about options.
 	DefaultOptions = &Options{
-		TableName:                 "migrations",
-		IDColumnName:              "id",
-		IDColumnSize:              255,
-		UseTransaction:            false,
-		ValidateUnknownMigrations: false,
+		TableName:      "migrations",
+		IDColumnName:   "id",
+		IDColumnSize:   255,
+		UseTransaction: false,
 	}
-
-	// ErrUnknownPastMigration is returned if a migration exists in the DB that doesn't exist in the code
-	ErrUnknownPastMigration = errors.New("gormigrate: Found migration in DB that does not exist in code")
 )
 
 // New returns a new Gormigrate.
@@ -114,16 +107,6 @@ func (g *Gormigrate) migrate(migrationID string) error {
 
 	if err := g.createMigrationTableIfNotExists(); err != nil {
 		return err
-	}
-
-	if g.options.ValidateUnknownMigrations {
-		unknownMigrations, err := g.unknownMigrationsHaveHappened()
-		if err != nil {
-			return err
-		}
-		if unknownMigrations {
-			return ErrUnknownPastMigration
-		}
 	}
 
 	if g.initSchema != nil {
@@ -348,33 +331,6 @@ func (g *Gormigrate) canInitializeSchema() (bool, error) {
 		Count(&count).
 		Error
 	return count == 0, err
-}
-
-func (g *Gormigrate) unknownMigrationsHaveHappened() (bool, error) {
-	sql := fmt.Sprintf("SELECT %s FROM %s", g.options.IDColumnName, g.options.TableName)
-	rows, err := g.tx.Raw(sql).Rows()
-	if err != nil {
-		return false, err
-	}
-	defer rows.Close()
-
-	validIDSet := make(map[string]struct{}, len(g.migrations)+1)
-	validIDSet[initSchemaMigrationID] = struct{}{}
-	for _, migration := range g.migrations {
-		validIDSet[migration.ID] = struct{}{}
-	}
-
-	for rows.Next() {
-		var pastMigrationID string
-		if err := rows.Scan(&pastMigrationID); err != nil {
-			return false, err
-		}
-		if _, ok := validIDSet[pastMigrationID]; !ok {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 func (g *Gormigrate) insertMigration(id string) error {

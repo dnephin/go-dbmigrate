@@ -366,33 +366,14 @@ func TestMigration_WithUseTransactionsShouldRollback(t *testing.T) {
 	}, "postgres", "sqlite3", "mssql")
 }
 
-func TestUnexpectedMigrationEnabled(t *testing.T) {
+func TestMigrate_WithUnknownMigrationsInTable(t *testing.T) {
 	forEachDatabase(t, func(db *gorm.DB) {
 		options := DefaultOptions
-		options.ValidateUnknownMigrations = true
 		m := New(db, options, migrations)
 
 		// Migrate without initialisation
 		assert.NilError(t, m.Migrate())
 
-		// Try with fewer migrations. Should fail as we see a migration in the db that
-		// we don't recognise any more
-		n := New(db, DefaultOptions, migrations[:1])
-		assert.Equal(t, ErrUnknownPastMigration, n.Migrate())
-	})
-}
-
-func TestUnexpectedMigrationDisabled(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
-		options := DefaultOptions
-		options.ValidateUnknownMigrations = false
-		m := New(db, options, migrations)
-
-		// Migrate without initialisation
-		assert.NilError(t, m.Migrate())
-
-		// Try with fewer migrations. Should pass as we see a migration in the db that
-		// we don't recognise any more, but the validation defaults off
 		n := New(db, DefaultOptions, migrations[:1])
 		assert.NilError(t, n.Migrate())
 	})
