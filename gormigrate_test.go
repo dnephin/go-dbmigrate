@@ -83,7 +83,7 @@ type Book struct {
 }
 
 func TestMigration(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		m := New(db, DefaultOptions, migrations)
 
 		err := m.Migrate()
@@ -107,7 +107,7 @@ func TestMigration(t *testing.T) {
 }
 
 func TestRollbackTo(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		m := New(db, DefaultOptions, extendedMigrations)
 
 		// First, apply all migrations.
@@ -131,7 +131,7 @@ func TestRollbackTo(t *testing.T) {
 // If initSchema is defined, but no migrations are provided,
 // then initSchema is executed.
 func TestInitSchemaNoMigrations(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		m := New(db, DefaultOptions, []*Migration{})
 		m.options.InitSchema = func(tx *gorm.DB) error {
 			if err := tx.AutoMigrate(&Person{}); err != nil {
@@ -154,7 +154,7 @@ func TestInitSchemaNoMigrations(t *testing.T) {
 // then initSchema is executed and the migration IDs are stored,
 // even though the relevant migrations are not applied.
 func TestInitSchemaWithMigrations(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		m := New(db, DefaultOptions, migrations)
 		m.options.InitSchema = func(tx *gorm.DB) error {
 			if err := tx.AutoMigrate(&Person{}); err != nil {
@@ -177,7 +177,7 @@ func TestInitSchemaAlreadyInitialised(t *testing.T) {
 		gorm.Model
 	}
 
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		m := New(db, DefaultOptions, []*Migration{})
 
 		// Migrate with empty initialisation
@@ -209,7 +209,7 @@ func TestInitSchemaExistingMigrations(t *testing.T) {
 		gorm.Model
 	}
 
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		m := New(db, DefaultOptions, migrations)
 
 		// Migrate without initialisation
@@ -231,7 +231,7 @@ func TestInitSchemaExistingMigrations(t *testing.T) {
 }
 
 func TestMissingID(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		migrationsMissingID := []*Migration{
 			{
 				Migrate: func(tx *gorm.DB) error {
@@ -246,7 +246,7 @@ func TestMissingID(t *testing.T) {
 }
 
 func TestReservedID(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		migrationsReservedID := []*Migration{
 			{
 				ID: "SCHEMA_INIT",
@@ -263,7 +263,7 @@ func TestReservedID(t *testing.T) {
 }
 
 func TestDuplicatedID(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		migrationsDuplicatedID := []*Migration{
 			{
 				ID: "201705061500",
@@ -286,7 +286,7 @@ func TestDuplicatedID(t *testing.T) {
 }
 
 func TestEmptyMigrationList(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		t.Run("with empty list", func(t *testing.T) {
 			m := New(db, DefaultOptions, []*Migration{})
 			err := m.Migrate()
@@ -305,7 +305,7 @@ func TestMigration_WithUseTransactions(t *testing.T) {
 	options := DefaultOptions
 	options.UseTransaction = true
 
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		m := New(db, options, migrations)
 
 		err := m.Migrate()
@@ -332,7 +332,7 @@ func TestMigration_WithUseTransactionsShouldRollback(t *testing.T) {
 	options := DefaultOptions
 	options.UseTransaction = true
 
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		assert.Assert(t, true)
 		m := New(db, options, failingMigration)
 
@@ -344,7 +344,7 @@ func TestMigration_WithUseTransactionsShouldRollback(t *testing.T) {
 }
 
 func TestMigrate_WithUnknownMigrationsInTable(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
+	forEachDatabase(t, func(t *testing.T, db *gorm.DB) {
 		options := DefaultOptions
 		m := New(db, options, migrations)
 
@@ -361,7 +361,7 @@ func tableCount(t *testing.T, db *gorm.DB, tableName string) (count int64) {
 	return
 }
 
-func forEachDatabase(t *testing.T, fn func(database *gorm.DB), dialects ...string) {
+func forEachDatabase(t *testing.T, fn func(t *testing.T, database *gorm.DB), dialects ...string) {
 	dir := t.TempDir()
 
 	databases := []database{
@@ -387,7 +387,7 @@ func forEachDatabase(t *testing.T, fn func(database *gorm.DB), dialects ...strin
 			// ensure tables do not exists
 			assert.NilError(t, db.Migrator().DropTable("migrations", "people", "pets"))
 
-			fn(db)
+			fn(t, db)
 		})
 	}
 }
