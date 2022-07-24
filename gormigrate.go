@@ -1,4 +1,4 @@
-package gormigrate
+package migrator
 
 import (
 	"errors"
@@ -17,7 +17,7 @@ type Options struct {
 	IDColumnName string
 	// IDColumnSize is the length of the migration id column
 	IDColumnSize int
-	// UseTransaction makes Gormigrate execute migrations inside a single transaction.
+	// UseTransaction makes Migrator execute migrations inside a single transaction.
 	// Keep in mind that not all databases support DDL commands inside transactions.
 	UseTransaction bool
 
@@ -38,8 +38,8 @@ type Migration struct {
 	Rollback func(*gorm.DB) error
 }
 
-// Gormigrate represents a collection of all migrations of a database schema.
-type Gormigrate struct {
+// Migrator represents a collection of all migrations of a database schema.
+type Migrator struct {
 	db         *gorm.DB
 	tx         *gorm.DB
 	options    Options
@@ -54,8 +54,8 @@ var DefaultOptions = Options{
 	UseTransaction: false,
 }
 
-// New returns a new Gormigrate.
-func New(db *gorm.DB, options Options, migrations []*Migration) *Gormigrate {
+// New returns a new Migrator.
+func New(db *gorm.DB, options Options, migrations []*Migration) *Migrator {
 	if options.TableName == "" {
 		options.TableName = DefaultOptions.TableName
 	}
@@ -65,7 +65,7 @@ func New(db *gorm.DB, options Options, migrations []*Migration) *Gormigrate {
 	if options.IDColumnSize == 0 {
 		options.IDColumnSize = DefaultOptions.IDColumnSize
 	}
-	return &Gormigrate{
+	return &Migrator{
 		db:         db,
 		options:    options,
 		migrations: migrations,
@@ -73,7 +73,7 @@ func New(db *gorm.DB, options Options, migrations []*Migration) *Gormigrate {
 }
 
 // Migrate executes all migrations that did not run yet.
-func (g *Gormigrate) Migrate() error {
+func (g *Migrator) Migrate() error {
 	if g.options.InitSchema == nil && len(g.migrations) == 0 {
 		return fmt.Errorf("there are no migrations")
 	}
@@ -111,7 +111,7 @@ func (g *Gormigrate) Migrate() error {
 	return g.commit()
 }
 
-func (g *Gormigrate) validate() error {
+func (g *Migrator) validate() error {
 	lookup := make(map[string]struct{}, len(g.migrations))
 	ids := make([]string, len(g.migrations))
 
@@ -131,7 +131,7 @@ func (g *Gormigrate) validate() error {
 	return nil
 }
 
-func (g *Gormigrate) checkIDExist(migrationID string) error {
+func (g *Migrator) checkIDExist(migrationID string) error {
 	if migrationID == initSchemaMigrationID {
 		return nil
 	}
@@ -145,7 +145,7 @@ func (g *Gormigrate) checkIDExist(migrationID string) error {
 
 // RollbackTo undoes migrations up to the given migration that matches the `migrationID`.
 // Migration with the matching `migrationID` is not rolled back.
-func (g *Gormigrate) RollbackTo(migrationID string) error {
+func (g *Migrator) RollbackTo(migrationID string) error {
 	if len(g.migrations) == 0 {
 		return fmt.Errorf("there are no migrations")
 	}
@@ -174,7 +174,7 @@ func (g *Gormigrate) RollbackTo(migrationID string) error {
 	return g.commit()
 }
 
-func (g *Gormigrate) rollbackMigration(m *Migration) error {
+func (g *Migrator) rollbackMigration(m *Migration) error {
 	if m.Rollback == nil {
 		return errors.New("migration can not be rollback back")
 	}
@@ -188,7 +188,7 @@ func (g *Gormigrate) rollbackMigration(m *Migration) error {
 	return g.tx.Exec(sql, m.ID).Error
 }
 
-func (g *Gormigrate) runInitSchema() error {
+func (g *Migrator) runInitSchema() error {
 	if err := g.options.InitSchema(g.tx); err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func (g *Gormigrate) runInitSchema() error {
 	return nil
 }
 
-func (g *Gormigrate) runMigration(migration *Migration) error {
+func (g *Migrator) runMigration(migration *Migration) error {
 	switch migrationRan, err := g.migrationRan(migration); {
 	case err != nil:
 		return err
@@ -217,7 +217,7 @@ func (g *Gormigrate) runMigration(migration *Migration) error {
 	return g.insertMigration(migration.ID)
 }
 
-func (g *Gormigrate) createMigrationTableIfNotExists() error {
+func (g *Migrator) createMigrationTableIfNotExists() error {
 	// TODO: replace gorm helper
 	if g.tx.Migrator().HasTable(g.options.TableName) {
 		return nil
@@ -230,7 +230,7 @@ func (g *Gormigrate) createMigrationTableIfNotExists() error {
 
 // TODO: select all values from the table once, instead of selecting each
 // individually
-func (g *Gormigrate) migrationRan(m *Migration) (bool, error) {
+func (g *Migrator) migrationRan(m *Migration) (bool, error) {
 	var count int64
 	err := g.tx.
 		Table(g.options.TableName).
@@ -240,7 +240,7 @@ func (g *Gormigrate) migrationRan(m *Migration) (bool, error) {
 	return count > 0, err
 }
 
-func (g *Gormigrate) shouldInitializeSchema() (bool, error) {
+func (g *Migrator) shouldInitializeSchema() (bool, error) {
 	migrationRan, err := g.migrationRan(&Migration{ID: initSchemaMigrationID})
 	if err != nil {
 		return false, err
@@ -258,13 +258,13 @@ func (g *Gormigrate) shouldInitializeSchema() (bool, error) {
 	return count == 0, err
 }
 
-func (g *Gormigrate) insertMigration(id string) error {
+func (g *Migrator) insertMigration(id string) error {
 	// TODO: use queryBuilder, or hardcode table and column name
 	sql := fmt.Sprintf("INSERT INTO %s (%s) VALUES (?)", g.options.TableName, g.options.IDColumnName)
 	return g.tx.Exec(sql, id).Error
 }
 
-func (g *Gormigrate) begin() func() {
+func (g *Migrator) begin() func() {
 	if g.options.UseTransaction {
 		g.tx = g.db.Begin()
 		return func() {
@@ -275,7 +275,7 @@ func (g *Gormigrate) begin() func() {
 	return func() {}
 }
 
-func (g *Gormigrate) commit() error {
+func (g *Migrator) commit() error {
 	if g.options.UseTransaction {
 		return g.tx.Commit().Error
 	}

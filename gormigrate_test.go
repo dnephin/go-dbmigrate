@@ -1,4 +1,4 @@
-package gormigrate
+package migrator
 
 import (
 	"errors"

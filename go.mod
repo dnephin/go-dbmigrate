@@ -1,4 +1,4 @@
-module github.com/go-gormigrate/gormigrate/v2
+module github.com/dnephin/go-dbmigrator
 
 go 1.17
 
