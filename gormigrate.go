@@ -102,8 +102,8 @@ func (g *Gormigrate) migrate(migrationID string) error {
 		return err
 	}
 
-	g.begin()
-	defer g.rollback()
+	rollback := g.begin()
+	defer rollback()
 
 	if err := g.createMigrationTableIfNotExists(); err != nil {
 		return err
@@ -174,8 +174,8 @@ func (g *Gormigrate) RollbackLast() error {
 		return fmt.Errorf("there are no migrations")
 	}
 
-	g.begin()
-	defer g.rollback()
+	rollback := g.begin()
+	defer rollback()
 
 	lastRunMigration, err := g.getLastRunMigration()
 	if err != nil {
@@ -199,8 +199,8 @@ func (g *Gormigrate) RollbackTo(migrationID string) error {
 		return err
 	}
 
-	g.begin()
-	defer g.rollback()
+	rollback := g.begin()
+	defer rollback()
 
 	for i := len(g.migrations) - 1; i >= 0; i-- {
 		migration := g.migrations[i]
@@ -238,8 +238,8 @@ func (g *Gormigrate) getLastRunMigration() (*Migration, error) {
 
 // RollbackMigration undo a migration.
 func (g *Gormigrate) RollbackMigration(m *Migration) error {
-	g.begin()
-	defer g.rollback()
+	rollback := g.begin()
+	defer rollback()
 
 	if err := g.rollbackMigration(m); err != nil {
 		return err
@@ -338,12 +338,15 @@ func (g *Gormigrate) insertMigration(id string) error {
 	return g.tx.Exec(sql, id).Error
 }
 
-func (g *Gormigrate) begin() {
+func (g *Gormigrate) begin() func() {
 	if g.options.UseTransaction {
 		g.tx = g.db.Begin()
-	} else {
-		g.tx = g.db
+		return func() {
+			g.tx.Rollback()
+		}
 	}
+	g.tx = g.db
+	return func() {}
 }
 
 func (g *Gormigrate) commit() error {
@@ -351,10 +354,4 @@ func (g *Gormigrate) commit() error {
 		return g.tx.Commit().Error
 	}
 	return nil
-}
-
-func (g *Gormigrate) rollback() {
-	if g.options.UseTransaction {
-		g.tx.Rollback()
-	}
 }
