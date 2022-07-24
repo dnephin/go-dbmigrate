@@ -92,13 +92,13 @@ func TestMigration(t *testing.T) {
 		assert.Assert(t, db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(2), tableCount(t, db, "migrations"))
 
-		err = m.RollbackLast()
+		err = m.RollbackTo(migrations[len(migrations)-2].ID)
 		assert.NilError(t, err)
 		assert.Assert(t, db.Migrator().HasTable(&Person{}))
 		assert.Assert(t, !db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(1), tableCount(t, db, "migrations"))
 
-		err = m.RollbackLast()
+		err = m.RollbackTo(initSchemaMigrationID)
 		assert.NilError(t, err)
 		assert.Assert(t, !db.Migrator().HasTable(&Person{}))
 		assert.Assert(t, !db.Migrator().HasTable(&Pet{}))
@@ -314,13 +314,13 @@ func TestMigration_WithUseTransactions(t *testing.T) {
 		assert.Assert(t, db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(2), tableCount(t, db, "migrations"))
 
-		err = m.RollbackLast()
+		err = m.RollbackTo(migrations[len(migrations)-2].ID)
 		assert.NilError(t, err)
 		assert.Assert(t, db.Migrator().HasTable(&Person{}))
 		assert.Assert(t, !db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(1), tableCount(t, db, "migrations"))
 
-		err = m.RollbackLast()
+		err = m.RollbackTo(initSchemaMigrationID)
 		assert.NilError(t, err)
 		assert.Assert(t, !db.Migrator().HasTable(&Person{}))
 		assert.Assert(t, !db.Migrator().HasTable(&Pet{}))

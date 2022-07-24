@@ -132,32 +132,15 @@ func (g *Gormigrate) validate() error {
 }
 
 func (g *Gormigrate) checkIDExist(migrationID string) error {
+	if migrationID == initSchemaMigrationID {
+		return nil
+	}
 	for _, migrate := range g.migrations {
 		if migrate.ID == migrationID {
 			return nil
 		}
 	}
 	return fmt.Errorf("migration ID %v does not exist", migrationID)
-}
-
-// RollbackLast undo the last migration
-func (g *Gormigrate) RollbackLast() error {
-	if len(g.migrations) == 0 {
-		return fmt.Errorf("there are no migrations")
-	}
-
-	rollback := g.begin()
-	defer rollback()
-
-	lastRunMigration, err := g.getLastRunMigration()
-	if err != nil {
-		return err
-	}
-
-	if err := g.rollbackMigration(lastRunMigration); err != nil {
-		return err
-	}
-	return g.commit()
 }
 
 // RollbackTo undoes migrations up to the given migration that matches the `migrationID`.
@@ -189,22 +172,6 @@ func (g *Gormigrate) RollbackTo(migrationID string) error {
 		}
 	}
 	return g.commit()
-}
-
-func (g *Gormigrate) getLastRunMigration() (*Migration, error) {
-	for i := len(g.migrations) - 1; i >= 0; i-- {
-		migration := g.migrations[i]
-
-		migrationRan, err := g.migrationRan(migration)
-		if err != nil {
-			return nil, err
-		}
-
-		if migrationRan {
-			return migration, nil
-		}
-	}
-	return nil, errors.New("could not find last run migration")
 }
 
 func (g *Gormigrate) rollbackMigration(m *Migration) error {
