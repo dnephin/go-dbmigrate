@@ -5,9 +5,8 @@ import (
 	"testing"
 
 	_ "github.com/joho/godotenv/autoload"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
+	"gotest.tools/v3/assert"
 )
 
 var databases []database
@@ -85,21 +84,21 @@ func TestMigration(t *testing.T) {
 		m := New(db, DefaultOptions, migrations)
 
 		err := m.Migrate()
-		assert.NoError(t, err)
-		assert.True(t, db.Migrator().HasTable(&Person{}))
-		assert.True(t, db.Migrator().HasTable(&Pet{}))
+		assert.NilError(t, err)
+		assert.Assert(t, db.Migrator().HasTable(&Person{}))
+		assert.Assert(t, db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(2), tableCount(t, db, "migrations"))
 
 		err = m.RollbackLast()
-		assert.NoError(t, err)
-		assert.True(t, db.Migrator().HasTable(&Person{}))
-		assert.False(t, db.Migrator().HasTable(&Pet{}))
+		assert.NilError(t, err)
+		assert.Assert(t, db.Migrator().HasTable(&Person{}))
+		assert.Assert(t, !db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(1), tableCount(t, db, "migrations"))
 
 		err = m.RollbackLast()
-		assert.NoError(t, err)
-		assert.False(t, db.Migrator().HasTable(&Person{}))
-		assert.False(t, db.Migrator().HasTable(&Pet{}))
+		assert.NilError(t, err)
+		assert.Assert(t, !db.Migrator().HasTable(&Person{}))
+		assert.Assert(t, !db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(0), tableCount(t, db, "migrations"))
 	})
 }
@@ -109,10 +108,10 @@ func TestMigrateTo(t *testing.T) {
 		m := New(db, DefaultOptions, extendedMigrations)
 
 		err := m.MigrateTo("201608301430")
-		assert.NoError(t, err)
-		assert.True(t, db.Migrator().HasTable(&Person{}))
-		assert.True(t, db.Migrator().HasTable(&Pet{}))
-		assert.False(t, db.Migrator().HasTable(&Book{}))
+		assert.NilError(t, err)
+		assert.Assert(t, db.Migrator().HasTable(&Person{}))
+		assert.Assert(t, db.Migrator().HasTable(&Pet{}))
+		assert.Assert(t, !db.Migrator().HasTable(&Book{}))
 		assert.Equal(t, int64(2), tableCount(t, db, "migrations"))
 	})
 }
@@ -123,18 +122,18 @@ func TestRollbackTo(t *testing.T) {
 
 		// First, apply all migrations.
 		err := m.Migrate()
-		assert.NoError(t, err)
-		assert.True(t, db.Migrator().HasTable(&Person{}))
-		assert.True(t, db.Migrator().HasTable(&Pet{}))
-		assert.True(t, db.Migrator().HasTable(&Book{}))
+		assert.NilError(t, err)
+		assert.Assert(t, db.Migrator().HasTable(&Person{}))
+		assert.Assert(t, db.Migrator().HasTable(&Pet{}))
+		assert.Assert(t, db.Migrator().HasTable(&Book{}))
 		assert.Equal(t, int64(3), tableCount(t, db, "migrations"))
 
 		// Rollback to the first migration: only the last 2 migrations are expected to be rolled back.
 		err = m.RollbackTo("201608301400")
-		assert.NoError(t, err)
-		assert.True(t, db.Migrator().HasTable(&Person{}))
-		assert.False(t, db.Migrator().HasTable(&Pet{}))
-		assert.False(t, db.Migrator().HasTable(&Book{}))
+		assert.NilError(t, err)
+		assert.Assert(t, db.Migrator().HasTable(&Person{}))
+		assert.Assert(t, !db.Migrator().HasTable(&Pet{}))
+		assert.Assert(t, !db.Migrator().HasTable(&Book{}))
 		assert.Equal(t, int64(1), tableCount(t, db, "migrations"))
 	})
 }
@@ -154,9 +153,9 @@ func TestInitSchemaNoMigrations(t *testing.T) {
 			return nil
 		})
 
-		assert.NoError(t, m.Migrate())
-		assert.True(t, db.Migrator().HasTable(&Person{}))
-		assert.True(t, db.Migrator().HasTable(&Pet{}))
+		assert.NilError(t, m.Migrate())
+		assert.Assert(t, db.Migrator().HasTable(&Person{}))
+		assert.Assert(t, db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(1), tableCount(t, db, "migrations"))
 	})
 }
@@ -174,9 +173,9 @@ func TestInitSchemaWithMigrations(t *testing.T) {
 			return nil
 		})
 
-		assert.NoError(t, m.Migrate())
-		assert.True(t, db.Migrator().HasTable(&Person{}))
-		assert.False(t, db.Migrator().HasTable(&Pet{}))
+		assert.NilError(t, m.Migrate())
+		assert.Assert(t, db.Migrator().HasTable(&Person{}))
+		assert.Assert(t, !db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(3), tableCount(t, db, "migrations"))
 	})
 }
@@ -195,7 +194,7 @@ func TestInitSchemaAlreadyInitialised(t *testing.T) {
 		m.InitSchema(func(tx *gorm.DB) error {
 			return nil
 		})
-		assert.NoError(t, m.Migrate())
+		assert.NilError(t, m.Migrate())
 
 		// Then migrate again, this time with a non empty initialisation
 		// This second initialisation should not happen!
@@ -205,9 +204,9 @@ func TestInitSchemaAlreadyInitialised(t *testing.T) {
 			}
 			return nil
 		})
-		assert.NoError(t, m.Migrate())
+		assert.NilError(t, m.Migrate())
 
-		assert.False(t, db.Migrator().HasTable(&Car{}))
+		assert.Assert(t, !db.Migrator().HasTable(&Car{}))
 		assert.Equal(t, int64(1), tableCount(t, db, "migrations"))
 	})
 }
@@ -224,7 +223,7 @@ func TestInitSchemaExistingMigrations(t *testing.T) {
 		m := New(db, DefaultOptions, migrations)
 
 		// Migrate without initialisation
-		assert.NoError(t, m.Migrate())
+		assert.NilError(t, m.Migrate())
 
 		// Then migrate again, this time with a non empty initialisation
 		// This initialisation should not happen!
@@ -234,9 +233,9 @@ func TestInitSchemaExistingMigrations(t *testing.T) {
 			}
 			return nil
 		})
-		assert.NoError(t, m.Migrate())
+		assert.NilError(t, m.Migrate())
 
-		assert.False(t, db.Migrator().HasTable(&Car{}))
+		assert.Assert(t, !db.Migrator().HasTable(&Car{}))
 		assert.Equal(t, int64(2), tableCount(t, db, "migrations"))
 	})
 }
@@ -279,7 +278,7 @@ func TestReservedID(t *testing.T) {
 
 		m := New(db, DefaultOptions, migrationsReservedID)
 		_, isReservedIDError := m.Migrate().(*ReservedIDError)
-		assert.True(t, isReservedIDError)
+		assert.Assert(t, isReservedIDError)
 	})
 }
 
@@ -302,7 +301,7 @@ func TestDuplicatedID(t *testing.T) {
 
 		m := New(db, DefaultOptions, migrationsDuplicatedID)
 		_, isDuplicatedIDError := m.Migrate().(*DuplicatedIDError)
-		assert.True(t, isDuplicatedIDError)
+		assert.Assert(t, isDuplicatedIDError)
 	})
 }
 
@@ -330,21 +329,21 @@ func TestMigration_WithUseTransactions(t *testing.T) {
 		m := New(db, options, migrations)
 
 		err := m.Migrate()
-		require.NoError(t, err)
-		assert.True(t, db.Migrator().HasTable(&Person{}))
-		assert.True(t, db.Migrator().HasTable(&Pet{}))
+		assert.NilError(t, err)
+		assert.Assert(t, db.Migrator().HasTable(&Person{}))
+		assert.Assert(t, db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(2), tableCount(t, db, "migrations"))
 
 		err = m.RollbackLast()
-		require.NoError(t, err)
-		assert.True(t, db.Migrator().HasTable(&Person{}))
-		assert.False(t, db.Migrator().HasTable(&Pet{}))
+		assert.NilError(t, err)
+		assert.Assert(t, db.Migrator().HasTable(&Person{}))
+		assert.Assert(t, !db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(1), tableCount(t, db, "migrations"))
 
 		err = m.RollbackLast()
-		require.NoError(t, err)
-		assert.False(t, db.Migrator().HasTable(&Person{}))
-		assert.False(t, db.Migrator().HasTable(&Pet{}))
+		assert.NilError(t, err)
+		assert.Assert(t, !db.Migrator().HasTable(&Person{}))
+		assert.Assert(t, !db.Migrator().HasTable(&Pet{}))
 		assert.Equal(t, int64(0), tableCount(t, db, "migrations"))
 	}, "postgres", "sqlite3", "mssql")
 }
@@ -354,13 +353,13 @@ func TestMigration_WithUseTransactionsShouldRollback(t *testing.T) {
 	options.UseTransaction = true
 
 	forEachDatabase(t, func(db *gorm.DB) {
-		assert.True(t, true)
+		assert.Assert(t, true)
 		m := New(db, options, failingMigration)
 
 		// Migration should return an error and not leave around a Book table
 		err := m.Migrate()
-		assert.Error(t, err)
-		assert.False(t, db.Migrator().HasTable(&Book{}))
+		assert.Error(t, err, "this transaction should be rolled back")
+		assert.Assert(t, !db.Migrator().HasTable(&Book{}))
 	}, "postgres", "sqlite3", "mssql")
 }
 
@@ -371,7 +370,7 @@ func TestUnexpectedMigrationEnabled(t *testing.T) {
 		m := New(db, options, migrations)
 
 		// Migrate without initialisation
-		assert.NoError(t, m.Migrate())
+		assert.NilError(t, m.Migrate())
 
 		// Try with fewer migrations. Should fail as we see a migration in the db that
 		// we don't recognise any more
@@ -387,17 +386,17 @@ func TestUnexpectedMigrationDisabled(t *testing.T) {
 		m := New(db, options, migrations)
 
 		// Migrate without initialisation
-		assert.NoError(t, m.Migrate())
+		assert.NilError(t, m.Migrate())
 
 		// Try with fewer migrations. Should pass as we see a migration in the db that
 		// we don't recognise any more, but the validation defaults off
 		n := New(db, DefaultOptions, migrations[:1])
-		assert.NoError(t, n.Migrate())
+		assert.NilError(t, n.Migrate())
 	})
 }
 
 func tableCount(t *testing.T, db *gorm.DB, tableName string) (count int64) {
-	assert.NoError(t, db.Table(tableName).Count(&count).Error)
+	assert.NilError(t, db.Table(tableName).Count(&count).Error)
 	return
 }
 
@@ -414,10 +413,10 @@ func forEachDatabase(t *testing.T, fn func(database *gorm.DB), dialects ...strin
 		// Ensure defers are not stacked up for each DB
 		func() {
 			db, err := gorm.Open(database.driver, &gorm.Config{})
-			require.NoError(t, err, "Could not connect to database %s, %v", database.dialect, err)
+			assert.NilError(t, err, "Could not connect to database %s, %v", database.dialect, err)
 
 			// ensure tables do not exists
-			assert.NoError(t, db.Migrator().DropTable("migrations", "people", "pets"))
+			assert.NilError(t, db.Migrator().DropTable("migrations", "people", "pets"))
 
 			fn(db)
 		}()
