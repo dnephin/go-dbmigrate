@@ -85,6 +85,7 @@ func (g *Gormigrate) Migrate() error {
 	rollback := g.begin()
 	defer rollback()
 
+	// TODO: do this in shouldInitializeSchema instead
 	if err := g.createMigrationTableIfNotExists(); err != nil {
 		return err
 	}
@@ -178,11 +179,10 @@ func (g *Gormigrate) RollbackTo(migrationID string) error {
 		if migration.ID == migrationID {
 			break
 		}
-		migrationRan, err := g.migrationRan(migration)
-		if err != nil {
+		switch migrationRan, err := g.migrationRan(migration); {
+		case err != nil:
 			return err
-		}
-		if migrationRan {
+		case migrationRan:
 			if err := g.rollbackMigration(migration); err != nil {
 				return err
 			}
@@ -216,6 +216,7 @@ func (g *Gormigrate) rollbackMigration(m *Migration) error {
 		return err
 	}
 
+	// TODO: use queryBuilder or hardcode table and column names
 	sql := fmt.Sprintf("DELETE FROM %s WHERE %s = ?", g.options.TableName, g.options.IDColumnName)
 	return g.tx.Exec(sql, m.ID).Error
 }
@@ -236,31 +237,32 @@ func (g *Gormigrate) runInitSchema() error {
 }
 
 func (g *Gormigrate) runMigration(migration *Migration) error {
-	migrationRan, err := g.migrationRan(migration)
-	if err != nil {
+	switch migrationRan, err := g.migrationRan(migration); {
+	case err != nil:
+		return err
+	case migrationRan:
+		return nil
+	}
+
+	if err := migration.Migrate(g.tx); err != nil {
 		return err
 	}
-	if !migrationRan {
-		if err := migration.Migrate(g.tx); err != nil {
-			return err
-		}
-
-		if err := g.insertMigration(migration.ID); err != nil {
-			return err
-		}
-	}
-	return nil
+	return g.insertMigration(migration.ID)
 }
 
 func (g *Gormigrate) createMigrationTableIfNotExists() error {
+	// TODO: replace gorm helper
 	if g.tx.Migrator().HasTable(g.options.TableName) {
 		return nil
 	}
 
+	// TODO: use queryBuilder or hardcode table and column names
 	sql := fmt.Sprintf("CREATE TABLE %s (%s VARCHAR(%d) PRIMARY KEY)", g.options.TableName, g.options.IDColumnName, g.options.IDColumnSize)
 	return g.tx.Exec(sql).Error
 }
 
+// TODO: select all values from the table once, instead of selecting each
+// individually
 func (g *Gormigrate) migrationRan(m *Migration) (bool, error) {
 	var count int64
 	err := g.tx.
@@ -271,7 +273,6 @@ func (g *Gormigrate) migrationRan(m *Migration) (bool, error) {
 	return count > 0, err
 }
 
-// TODO: only check for the existence of the table
 func (g *Gormigrate) shouldInitializeSchema() (bool, error) {
 	migrationRan, err := g.migrationRan(&Migration{ID: initSchemaMigrationID})
 	if err != nil {
@@ -291,6 +292,7 @@ func (g *Gormigrate) shouldInitializeSchema() (bool, error) {
 }
 
 func (g *Gormigrate) insertMigration(id string) error {
+	// TODO: use queryBuilder, or hardcode table and column name
 	sql := fmt.Sprintf("INSERT INTO %s (%s) VALUES (?)", g.options.TableName, g.options.IDColumnName)
 	return g.tx.Exec(sql, id).Error
 }
