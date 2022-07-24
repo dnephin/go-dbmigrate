@@ -89,14 +89,6 @@ func (g *Gormigrate) Migrate() error {
 	return g.migrate(targetMigrationID)
 }
 
-// MigrateTo executes all migrations that did not run yet up to the migration that matches `migrationID`.
-func (g *Gormigrate) MigrateTo(migrationID string) error {
-	if err := g.checkIDExist(migrationID); err != nil {
-		return err
-	}
-	return g.migrate(migrationID)
-}
-
 func (g *Gormigrate) migrate(migrationID string) error {
 	if err := g.validate(); err != nil {
 		return err
@@ -234,17 +226,6 @@ func (g *Gormigrate) getLastRunMigration() (*Migration, error) {
 		}
 	}
 	return nil, errors.New("could not find last run migration")
-}
-
-// RollbackMigration undo a migration.
-func (g *Gormigrate) RollbackMigration(m *Migration) error {
-	rollback := g.begin()
-	defer rollback()
-
-	if err := g.rollbackMigration(m); err != nil {
-		return err
-	}
-	return g.commit()
 }
 
 func (g *Gormigrate) rollbackMigration(m *Migration) error {

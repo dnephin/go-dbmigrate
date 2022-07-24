@@ -106,19 +106,6 @@ func TestMigration(t *testing.T) {
 	})
 }
 
-func TestMigrateTo(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
-		m := New(db, DefaultOptions, extendedMigrations)
-
-		err := m.MigrateTo("201608301430")
-		assert.NilError(t, err)
-		assert.Assert(t, db.Migrator().HasTable(&Person{}))
-		assert.Assert(t, db.Migrator().HasTable(&Pet{}))
-		assert.Assert(t, !db.Migrator().HasTable(&Book{}))
-		assert.Equal(t, int64(2), tableCount(t, db, "migrations"))
-	})
-}
-
 func TestRollbackTo(t *testing.T) {
 	forEachDatabase(t, func(db *gorm.DB) {
 		m := New(db, DefaultOptions, extendedMigrations)
@@ -240,16 +227,6 @@ func TestInitSchemaExistingMigrations(t *testing.T) {
 
 		assert.Assert(t, !db.Migrator().HasTable(&Car{}))
 		assert.Equal(t, int64(2), tableCount(t, db, "migrations"))
-	})
-}
-
-func TestMigrationIDDoesNotExist(t *testing.T) {
-	forEachDatabase(t, func(db *gorm.DB) {
-		m := New(db, DefaultOptions, migrations)
-		assert.ErrorContains(t, m.MigrateTo("1234"), "migration ID 1234 does not exist")
-		assert.ErrorContains(t, m.RollbackTo("1234"), "migration ID 1234 does not exist")
-		assert.ErrorContains(t, m.RollbackTo(""), "migration ID  does not exist")
-		assert.ErrorContains(t, m.RollbackTo(""), "migration ID  does not exist")
 	})
 }
 
